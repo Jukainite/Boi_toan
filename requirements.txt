@@ -1,7 +1,7 @@
 streamlit
 torch
 torchvision
-opencv-python==4.2.0.*
+opencv-python==4.5.4.60
 Pillow
 numpy
 pandas
