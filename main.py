@@ -10,7 +10,7 @@ import numpy as np
 import time
 # Load lại mô hình đã được huấn luyện
 model_path = r"face_shape_classifier.pth"
-device = torch.device('cpu')  # Sử dụng CPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Sử dụng CPU
 model = torchvision.models.efficientnet_b4(pretrained=False)
 num_classes = 5
 model.classifier = nn.Sequential(
