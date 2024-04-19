@@ -10,3 +10,4 @@ streamlit-webrtc
 efficientnet
 matplotlib
 tensorflow
+efficientnet-pytorch
