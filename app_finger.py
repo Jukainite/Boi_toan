@@ -41,6 +41,7 @@ class_info = {
 
 
 # Function to preprocess image for prediction
+@st.cache
 def preprocess_image(image_path):
     img = cv2.imread(image_path)
     img = cv2.resize(img, (128, 128))
@@ -49,6 +50,7 @@ def preprocess_image(image_path):
 
 
 # Function to predict label for input image
+@st.cache
 def predict_label(image_path):
     preprocessed_img = preprocess_image(image_path)
     predicted_prob = model.predict(preprocessed_img)
