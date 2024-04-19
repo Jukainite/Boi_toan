@@ -9,3 +9,4 @@ altair
 streamlit-webrtc
 efficientnet
 matplotlib
+tensorflow
