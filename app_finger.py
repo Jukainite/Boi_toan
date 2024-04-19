@@ -1,21 +1,48 @@
+# Loại bỏ import và tạo model từ TensorFlow và EfficientNet
 import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from tensorflow import keras
-
-import efficientnet.keras as efn
+import torch
+import torch.nn as nn
+import torchvision.transforms as transforms
+from efficientnet_pytorch import EfficientNet
 import streamlit as st
-import tensorflow as tf
-# Load the trained model
 
-@st.cache(allow_output_mutation=True)
-def load_model():
-    model = keras.models.load_model(r'fingerprint_efficientnet.h5', compile=False)
-    return model
-model = load_model()
-# Define class labels and corresponding information
 classes = ['Hình cung', 'Vòng tròn hướng tâm', 'Vòng lặp Ulnar', 'Vòm lều', 'Vòng xoáy']
+class FingerprintCNN(nn.Module):
+    def __init__(self):
+        super(FingerprintCNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(128 * 4 * 4, 128)
+        self.fc2 = nn.Linear(128, len(classes))
+
+    def forward(self, x):
+        x = self.pool(nn.functional.relu(self.conv1(x)))
+        x = self.pool(nn.functional.relu(self.conv2(x)))
+        x = self.pool(nn.functional.relu(self.conv3(x)))
+        x = self.pool(nn.functional.relu(self.conv4(x)))
+        x = self.pool(nn.functional.relu(self.conv5(x)))
+        x = x.view(-1, 128 * 4 * 4)
+        x = nn.functional.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+# Load the trained model
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+model = FingerprintCNN()
+model.load_state_dict(torch.load(r'fingerprint.pth', map_location=device))
+model.eval()
+
+
+
+# Define class labels and corresponding information
+
 class_info = {
     'Vòng xoáy': {
         'description': 'Những người có dấu vân tay vòng xoáy cực kỳ độc lập và có đặc điểm tính cách nổi trội. Vòng xoáy thường biểu thị mức độ thông minh cao và tính cách có ý chí mạnh mẽ. Những đặc điểm tiêu cực- Bản chất thống trị của họ đôi khi có thể dẫn đến chủ nghĩa hoàn hảo và thiếu sự đồng cảm với người khác.',
@@ -41,7 +68,8 @@ class_info = {
 
 
 # Function to preprocess image for prediction
-@st.cache
+
+# Function to preprocess image for prediction
 def preprocess_image(image_path):
     img = cv2.imread(image_path)
     img = cv2.resize(img, (128, 128))
@@ -50,13 +78,22 @@ def preprocess_image(image_path):
 
 
 # Function to predict label for input image
-@st.cache
 def predict_label(image_path):
-    preprocessed_img = preprocess_image(image_path)
-    predicted_prob = model.predict(preprocessed_img)
-    predicted_class = np.argmax(predicted_prob)
-    predicted_label = classes[predicted_class]
-    return predicted_label
+    img = cv2.imread(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+    ])
+    img = transform(img)
+    img = img.unsqueeze(0)  # Add batch dimension
+    with torch.no_grad():
+        outputs = model(img)
+        _, predicted = torch.max(outputs, 1)
+    predicted_class = classes[predicted.item()]
+    return predicted_class
+
+
+
 
 
 
