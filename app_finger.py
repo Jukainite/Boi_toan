@@ -9,6 +9,7 @@ import streamlit as st
 import tensorflow as tf
 # Load the trained model
 
+@st.cache(allow_output_mutation=True)
 def load_model():
     model = keras.models.load_model(r'fingerprint_efficientnet.h5', compile=False)
     return model
