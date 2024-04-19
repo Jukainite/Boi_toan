@@ -6,7 +6,7 @@ from tensorflow import keras
 import efficientnet.keras as efn
 import streamlit as st
 # Load the trained model
-model = keras.models.load_model(r'D:\Final1\boi\Finger_print\fingerprint_efficientnet.h5')
+model = keras.models.load_model(r'fingerprint_efficientnet.h5')
 
 # Define class labels and corresponding information
 classes = ['Hình cung', 'Vòng tròn hướng tâm', 'Vòng lặp Ulnar', 'Vòm lều', 'Vòng xoáy']
