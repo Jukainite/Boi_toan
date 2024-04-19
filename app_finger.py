@@ -8,8 +8,11 @@ import efficientnet.keras as efn
 import streamlit as st
 import tensorflow as tf
 # Load the trained model
-model = load_model(r'fingerprint_efficientnet.h5', compile=False)
 
+def load_model():
+    model = load_model(r'fingerprint_efficientnet.h5', compile=False)
+    return model
+model = load_model()
 # Define class labels and corresponding information
 classes = ['Hình cung', 'Vòng tròn hướng tâm', 'Vòng lặp Ulnar', 'Vòm lều', 'Vòng xoáy']
 class_info = {
