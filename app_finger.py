@@ -3,14 +3,14 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow import keras
-from tensorflow.keras.models import load_model
+
 import efficientnet.keras as efn
 import streamlit as st
 import tensorflow as tf
 # Load the trained model
 
 def load_model():
-    model = load_model(r'fingerprint_efficientnet.h5', compile=False)
+    model = keras.models.load_model(r'fingerprint_efficientnet.h5', compile=False)
     return model
 model = load_model()
 # Define class labels and corresponding information
