@@ -1,5 +1,4 @@
-
-# Loại bỏ import và tạo model từ TensorFlow và EfficientNet
+from PIL import Image
 import os
 import cv2
 import numpy as np
