@@ -1,3 +1,4 @@
+
 # Loại bỏ import và tạo model từ TensorFlow và EfficientNet
 import os
 import cv2
@@ -8,7 +9,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from efficientnet_pytorch import EfficientNet
 import streamlit as st
-
+st.set_page_config(layout="wide")
 classes = ['Hình cung', 'Vòng tròn hướng tâm', 'Vòng lặp Ulnar', 'Vòm lều', 'Vòng xoáy']
 class FingerprintCNN(nn.Module):
     def __init__(self):
