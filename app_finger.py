@@ -10,7 +10,13 @@ import torchvision.transforms as transforms
 from efficientnet_pytorch import EfficientNet
 import streamlit as st
 st.set_page_config(layout="wide")
+st.header("Sinh trắc học vân tay")
+st.write(
+    "Sinh trắc học vân tay là nghiên cứu về các đặc điểm vân tay để xác định tính cách và tương lai của một người.")
+# You can add content related to palmistry here
+
 classes = ['Hình cung', 'Vòng tròn hướng tâm', 'Vòng lặp Ulnar', 'Vòm lều', 'Vòng xoáy']
+
 class FingerprintCNN(nn.Module):
     def __init__(self):
         super(FingerprintCNN, self).__init__()
@@ -36,9 +42,9 @@ class FingerprintCNN(nn.Module):
 # Load the trained model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-model = FingerprintCNN()
-model.load_state_dict(torch.load(r'fingerprint.pth', map_location=device))
-model.eval()
+model_fin = FingerprintCNN()
+model_fin.load_state_dict(torch.load(r'fingerprint.pth', map_location=device))
+model_fin.eval()
 
 
 
@@ -68,19 +74,13 @@ class_info = {
 }
 
 
-# Function to preprocess image for prediction
 
-# Function to preprocess image for prediction
-def preprocess_image(image_path):
-    img = cv2.imread(image_path)
-    img = cv2.resize(img, (128, 128))
-    img = img / 255.0  # Normalize
-    return img.reshape(-1, 128, 128, 3)
 
 
 # Function to predict label for input image
-def predict_label(image_path):
-    img = cv2.imread(image_path)
+def predict_label(img):
+    # img = cv2.imread(image_path)
+    img = np.array(img)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB
     img = cv2.resize(img, (128, 128))  # Resize the image to 128x128
     img.reshape(-1, 128, 128, 3)
@@ -90,11 +90,33 @@ def predict_label(image_path):
     img = transform(img)
     img = img.unsqueeze(0)  # Add batch dimension
     with torch.no_grad():
-        outputs = model(img)
+        outputs = model_fin(img)
         _, predicted = torch.max(outputs, 1)
     predicted_class = classes[predicted.item()]
     return predicted_class
 
+uploaded_file = st.file_uploader("Nhập ảnh vân tay của bạn", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
+    # Display the uploaded image
+    st.image(uploaded_file, caption='Uploaded Image', width=200, use_column_width=False)
+
+    # Start prediction when "Start" button is clicked
+    if st.button('Start'):
+        # Save the uploaded file locally
+        # with open(uploaded_file.name, "wb") as f:
+        #     f.write(uploaded_file.getbuffer())
+        image = Image.open(uploaded_file)
+        # Predict label
+        predicted_label = predict_label(image)
+
+        # Display prediction result
+        st.header('Predicted Label:')
+        st.write(predicted_label)
+        st.header('Personality Traits:')
+        st.write('Để xem lí giải cụ thể, bạn hãy đăng kí gói vip của sinh trắc học vân tay ! ♥ ♥ ♥')
+        st.header('Suitable Careers:')
+        st.write(class_info[predicted_label]['careers'])
 
 
 
