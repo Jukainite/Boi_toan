@@ -122,28 +122,3 @@ if uploaded_file is not None:
 
 
 
-# Streamlit App
-st.title('Ứng Dụng Sinh Trắc Học Vân Tay')
-
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-
-if uploaded_file is not None:
-    # Display the uploaded image
-    st.image(uploaded_file, caption='Uploaded Image', width=200, use_column_width=False)
-
-    # Start prediction when "Start" button is clicked
-    if st.button('Start'):
-        # Save the uploaded file locally
-        with open(uploaded_file.name, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-
-        # Predict label
-        predicted_label = predict_label(uploaded_file.name)
-
-        # Display prediction result
-        st.header('Predicted Label:')
-        st.write(predicted_label)
-        st.header('Personality Traits:')
-        st.write('Để xem lí giải cụ thể, bạn hãy đăng kí gói vip của sinh trắc học vân tay ! ♥ ♥ ♥')
-        st.header('Suitable Careers:')
-        st.write(class_info[predicted_label]['careers'])
