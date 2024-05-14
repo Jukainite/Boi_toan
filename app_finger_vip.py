@@ -115,10 +115,10 @@ if uploaded_file is not None:
         # Display prediction result
         
         filename = f"data/{predicted_label}.txt"
-        sanitized_filename = re.sub(r'[\\/:"*?<>|]+', '_', filename)
+
     
         # Đọc nội dung từ tệp văn bản tương ứng
-        content = read_file_content(sanitized_filename)
+        content = read_file_content(filename)
         
         # Hiển thị nhãn dự đoán
         st.subheader("Loại Dấu Vân Tay:")
