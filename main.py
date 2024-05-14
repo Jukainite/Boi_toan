@@ -1,176 +1,135 @@
-import streamlit as st
+from PIL import Image
+import os
 import cv2
+import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-import torchvision
-from torchvision import transforms
-from PIL import Image
-from collections import Counter
-import numpy as np
-import time
-# Load lại mô hình đã được huấn luyện
-model_path = r"face_shape_classifier.pth"
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # Sử dụng CPU
-model = torchvision.models.efficientnet_b4(pretrained=False)
-num_classes = 5
-model.classifier = nn.Sequential(
-    nn.Linear(model.classifier[1].in_features, num_classes)
-)
-model.load_state_dict(torch.load(model_path, map_location=device))
-model.eval()
-class MyNormalize(object):
-    def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
+import torchvision.transforms as transforms
+from efficientnet_pytorch import EfficientNet
+import streamlit as st
+st.set_page_config(layout="wide")
+st.header("Sinh trắc học vân tay")
+st.write(
+    "Sinh trắc học vân tay là nghiên cứu về các đặc điểm vân tay để xác định tính cách và tương lai của một người.")
+# You can add content related to palmistry here
 
-    def __call__(self, tensor):
-        # Kiểm tra số kênh của tensor
-        if tensor.size(0) == 1:  # Nếu là ảnh xám
-            # Thêm một kênh để đảm bảo phù hợp với normalize
-            tensor = torch.cat([tensor, tensor, tensor], 0)
+classes = ['Hình cung', 'Vòng tròn hướng tâm', 'Vòng lặp Ulnar', 'Vòm lều', 'Vòng xoáy']
 
-        # Normalize tensor
-        tensor = transforms.functional.normalize(tensor, self.mean, self.std)
-        return tensor
-# Định nghĩa biến đổi cho ảnh đầu vào
-transform = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    MyNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+class FingerprintCNN(nn.Module):
+    def __init__(self):
+        super(FingerprintCNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.conv5 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(128 * 4 * 4, 128)
+        self.fc2 = nn.Linear(128, len(classes))
 
-# Load mô hình nhận diện khuôn mặt
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    def forward(self, x):
+        x = self.pool(nn.functional.relu(self.conv1(x)))
+        x = self.pool(nn.functional.relu(self.conv2(x)))
+        x = self.pool(nn.functional.relu(self.conv3(x)))
+        x = self.pool(nn.functional.relu(self.conv4(x)))
+        x = self.pool(nn.functional.relu(self.conv5(x)))
+        x = x.view(-1, 128 * 4 * 4)
+        x = nn.functional.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+# Load the trained model
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
-# Định nghĩa hàm dự đoán qua ảnh
-def predict_from_image(image):
-    # Chuyển ảnh sang grayscale nếu cần thiết
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-
-    # Chuyển ảnh sang numpy array
-    image_np = np.array(image)
-
-    # Chuyển ảnh sang grayscale để sử dụng mô hình nhận diện khuôn mặt
-    gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
-
-    # Nhận diện khuôn mặt trong ảnh
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-
-    # Nếu tìm thấy khuôn mặt, lấy ảnh khuôn mặt và thực hiện dự đoán
-    if len(faces) > 0:
-        x, y, w, h = faces[0]  # Giả sử chỉ lấy khuôn mặt đầu tiên
-        face_img = image.crop((x, y, x + w, y + h))  # Cắt ảnh khuôn mặt từ ảnh gốc
-
-        # Áp dụng biến đổi cho ảnh khuôn mặt
-        input_image = transform(face_img).unsqueeze(0)  # Thêm chiều batch (batch size = 1)
-
-        # Thực hiện dự đoán
-        with torch.no_grad():
-            output = model(input_image)
-
-        # Lấy chỉ số có giá trị lớn nhất là nhãn dự đoán
-        predicted_class_idx = torch.argmax(output).item()
-
-        train_dataset = {0: 'Heart', 1: 'Oblong', 2: 'Oval', 3: 'Round', 4: 'Square'}
-        # Lấy tên của nhãn dự đoán từ tập dữ liệu
-        predicted_label = train_dataset[predicted_class_idx]
-
-        return predicted_label
-    else:
-        return "No face detected."
+model_fin = FingerprintCNN()
+model_fin.load_state_dict(torch.load(r'fingerprint.pth', map_location=device))
+model_fin.eval()
 
 
-# Định nghĩa chức năng dự đoán qua webcam
-def predict_from_webcam():
-    predicted_labels = []
 
-    # Mở webcam
-    cap = cv2.VideoCapture(0)
+# Define class labels and corresponding information
 
-    # Thời gian chạy webcam (10 giây)
-    end_time = time.time() + 5
-
-    while time.time() < end_time:
-        # Đọc frame từ webcam
-        ret, frame = cap.read()
-
-        # Chuyển đổi frame sang ảnh grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Nhận diện khuôn mặt trong frame
-        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-
-        # Vẽ hình chữ nhật xung quanh các khuôn mặt và thực hiện dự đoán
-        if len(faces)>0:
-            try:
-                for (x, y, w, h) in faces:
-                    # Vẽ hình chữ nhật xung quanh khuôn mặt
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-
-                    # Chụp ảnh khuôn mặt và chuyển đổi thành tensor
-                    face_img = frame[y:y + h, x:x + w]
-                    pil_img = Image.fromarray(cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB))
-                    input_image = transform(pil_img).unsqueeze(0)
-                    with torch.no_grad():
-                        output = model(input_image)
-
-                    # Lấy chỉ số có giá trị lớn nhất là nhãn dự đoán
-                    predicted_class_idx = torch.argmax(output).item()
-                    train_dataset = {0: 'Heart', 1: 'Oblong', 2: 'Oval', 3: 'Round', 4: 'Square'}
-                    # Lấy tên của nhãn dự đoán từ tập dữ liệu
-                    predicted_label = train_dataset[predicted_class_idx]
-                    cv2.putText(frame, predicted_label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
-                    # Lưu nhãn dự đoán vào danh sách
+class_info = {
+    'Vòng xoáy': {
+        'description': 'Những người có dấu vân tay vòng xoáy cực kỳ độc lập và có đặc điểm tính cách nổi trội. Vòng xoáy thường biểu thị mức độ thông minh cao và tính cách có ý chí mạnh mẽ. Những đặc điểm tiêu cực- Bản chất thống trị của họ đôi khi có thể dẫn đến chủ nghĩa hoàn hảo và thiếu sự đồng cảm với người khác.',
+        'careers': ['Công nghệ thông tin và Lập trình', 'Kinh doanh và Quản lý', 'Nghệ thuật và Sáng tạo']
+    },
+    'Hình cung': {
+        'description': 'Những người có dấu vân tay hình vòm có đặc điểm phân tích, thực tế và có tổ chức trong hành vi của họ. Họ sẽ tạo nên một sự nghiệp xuất sắc với tư cách là nhà khoa học hoặc bất kỳ lĩnh vực nào cần ứng dụng phương pháp luận. Đặc điểm tiêu cực- Họ là những người ít chấp nhận rủi ro nhất và không muốn đi chệch khỏi con đường cố định của mình.',
+        'careers': ['Triết học và Nghiên cứu', 'Tài chính và Đầu tư', 'Công nghệ thông tin và Lập trình']
+    },
+    'Vòm lều': {
+        'description': 'Một trong những đặc điểm tính cách của dấu vân tay bốc đồng là vòm lều. Họ thường thô lỗ và dường như không giới hạn bất kỳ hành vi cụ thể nào. Họ có thể chào đón một ngày và hoàn toàn không quan tâm vào ngày khác. Một lần nữa mái vòm hình lều là một dấu vân tay hiếm có thể tìm thấy.',
+        'careers': ['Nghệ thuật và Sáng tạo', 'Truyền thông và Quảng cáo', 'Du lịch và Phiêu lưu']
+    },
+    'Vòng lặp Ulnar': {
+        'description': 'Hạnh phúc khi đi theo dòng chảy và nói chung là hài lòng với cuộc sống, Hãy đối tác và nhân viên xuất sắc, Dễ gần và vui vẻ hòa nhập với dòng chảy, Thoải mái lãnh đạo một nhóm, Không giỏi tổ chức, Chấp nhận sự thay đổi, Có đạo đức làm việc tốt.',
+        'careers': ['Truyền thông và Quảng cáo', 'Giáo dục và Đào tạo', 'Du lịch và Phiêu lưu']
+    },
+    'Vòng tròn hướng tâm': {
+        'description': 'Những người có kiểu vòng tròn hướng tâm có xu hướng tự cho mình là trung tâm và ích kỷ. Họ thích đi ngược lại số đông, thắc mắc và chỉ trích. Họ yêu thích sự độc lập và thường rất thông minh.',
+        'careers': ['Nghiên cứu và Phát triển', 'Nghệ thuật và Văn hóa', 'Nghệ thuật và Sáng tạo']
+    }
+}
 
 
-                    predicted_labels.append(predicted_label)
-            except:
-                predicted_labels.append("No face detected")
-        else:
-            predicted_labels.append("No face detected")
 
-        # Hiển thị frame
-        cv2.imshow('Face Detection', frame)
-        # st.image(frame, channels="BGR", use_column_width=True)
+# Hàm để đọc nội dung từ tệp văn bản
+def read_file_content(filename):
+    with open(filename, 'r', encoding='utf-8') as file:
+        return file.read()
 
-        # Nhấn 'q' để thoát khỏi vòng lặp
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+# Function to predict label for input image
+def predict_label(img):
+    # img = cv2.imread(image_path)
+    img = np.array(img)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB
+    img = cv2.resize(img, (128, 128))  # Resize the image to 128x128
+    img.reshape(-1, 128, 128, 3)
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+    ])
+    img = transform(img)
+    img = img.unsqueeze(0)  # Add batch dimension
+    with torch.no_grad():
+        outputs = model_fin(img)
+        _, predicted = torch.max(outputs, 1)
+    predicted_class = classes[predicted.item()]
+    return predicted_class
 
-    # Đóng webcam và cửa sổ
-    cap.release()
-    cv2.destroyAllWindows()
+uploaded_file = st.file_uploader("Nhập ảnh vân tay của bạn", type=["jpg", "jpeg", "png"])
 
-    # Đếm số lần xuất hiện của mỗi nhãn dự đoán
-    label_counts = Counter(predicted_labels)
+if uploaded_file is not None:
+    # Display the uploaded image
+    st.image(uploaded_file, caption='Uploaded Image', width=200, use_column_width=False)
 
-    # Lấy nhãn có số lần xuất hiện nhiều nhất
-    most_common_label = label_counts.most_common(1)[0][0]
+    # Start prediction when "Start" button is clicked
+    if st.button('Start'):
+        # Save the uploaded file locally
+        # with open(uploaded_file.name, "wb") as f:
+        #     f.write(uploaded_file.getbuffer())
+        image = Image.open(uploaded_file)
+        # Predict label
+        predicted_label = predict_label(image)
 
-    return most_common_label
+        # Display prediction result
+        
+        filename = f"data/{predicted_label}.txt"
+
+    
+        # Đọc nội dung từ tệp văn bản tương ứng
+        content = read_file_content(filename)
+        
+        # Hiển thị nhãn dự đoán
+        st.subheader("Loại Dấu Vân Tay:")
+        st.markdown(
+            f"<p style='text-align:center; font-size:60px; color:blue'><strong>{predicted_label}</strong></p>",
+            unsafe_allow_html=True)
+    
+        # Hiển thị nội dung từ tệp văn bản
+        st.markdown("**Thông tin chi tiết:**")
+        st.text_area(" ", content, height=300)
+    
+        st.write("Để xem lí giải cụ thể, bạn hãy đăng kí gói vip của sinh trắc học vân tay! ♥ ♥ ♥")
 
 
-# Định nghĩa giao diện Streamlit
-def main():
-    st.title("Face Shape Prediction")
-
-    # Lựa chọn phương pháp dự đoán
-    prediction_method = st.radio("Choose prediction method:", ("Webcam", "Image"))
-
-    if prediction_method == "Webcam":
-        st.write("Press 'q' to stop the webcam prediction after 10 seconds.")
-        most_common_label = predict_from_webcam()
-        st.write("Most common label:", most_common_label)
-    else:
-        image_file = st.file_uploader("Upload Image", type=['jpg', 'jpeg', 'png'])
-        if image_file is not None:
-            image = Image.open(image_file)
-            predicted_label = predict_from_image(image)
-            st.write("Predicted label:", predicted_label)
-
-
-if __name__ == "__main__":
-    main()
